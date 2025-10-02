@@ -57,7 +57,7 @@ const ResultsPage = ({ results, onBack, onHighlightAnswer, onGoogleSearch }) => 
               </button>
               <button 
                 className="search-button"
-                onClick={() => onGoogleSearch(question.question)}
+                onClick={() => onGoogleSearch(question)}
               >
                 Google Search
               </button>

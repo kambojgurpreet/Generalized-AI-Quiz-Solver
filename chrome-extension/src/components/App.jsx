@@ -109,10 +109,23 @@ const App = () => {
     }
   };
 
-  const handleGoogleSearch = (question) => {
-    console.log('🔍 Opening Google search for:', question.substring(0, 50) + '...');
-    const searchQuery = encodeURIComponent(question);
-    const searchUrl = `https://www.google.com/search?q=${searchQuery}`;
+  const handleGoogleSearch = (questionObj) => {
+    console.log('🔍 Opening Google search for:', questionObj.question.substring(0, 50) + '...');
+    
+    // Create a comprehensive search query with question and options
+    let searchQuery = questionObj.question;
+    
+    // Add options to the search query for better context
+    if (questionObj.options && questionObj.options.length > 0) {
+      const optionsText = questionObj.options.map((option, index) => 
+        `${String.fromCharCode(65 + index)}) ${option}`
+      ).join(' ');
+      searchQuery += ` ${optionsText}`;
+    }
+    
+    const encodedQuery = encodeURIComponent(searchQuery);
+    const searchUrl = `https://www.google.com/search?q=${encodedQuery}`;
+    console.log('🔍 Search URL:', searchUrl);
     chrome.tabs.create({ url: searchUrl });
   };
 
