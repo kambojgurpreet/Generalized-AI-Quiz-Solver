@@ -53,8 +53,8 @@ const App = () => {
       const pageContent = result[0].result;
       console.log('📝 Extracted content length:', pageContent.content.length);
       
-      // Send to backend API
-      console.log('🚀 Sending request to backend...');
+      // Send to BE API
+      console.log('🚀 Sending request to BE...');
       const response = await fetch('http://localhost:8000/api/detect-mcqs', {
         method: 'POST',
         headers: {

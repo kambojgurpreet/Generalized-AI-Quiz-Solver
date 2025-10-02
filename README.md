@@ -1,6 +1,6 @@
 # AI Quiz Solver
 
-A Chrome extension with AI-powered backend that detects Multiple Choice Questions (MCQs) on web pages and provides answers using advanced AI models with consensus-based validation.
+A Chrome extension with AI-powered BE that detects Multiple Choice Questions (MCQs) on web pages and provides answers using advanced AI models with consensus-based validation.
 
 ## Features
 
@@ -29,7 +29,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 
 ```
 .
-├── chrome-extension/          # React-based Chrome extension
+├── UI/          # React-based Chrome extension
 │   ├── src/
 │   │   ├── components/        # React components
 │   │   ├── pages/            # Main pages (MainPage, ResultsPage)
@@ -43,7 +43,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 │   ├── package.json          # Dependencies
 │   └── webpack.config.js     # Build configuration
 │
-├── backend/                  # FastAPI backend server
+├── BE/                  # FastAPI BE server
 │   ├── app/
 │   │   ├── api/              # API routes
 │   │   ├── models/           # Pydantic models
@@ -65,9 +65,9 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 
 ### Backend Setup
 
-1. **Navigate to backend directory:**
+1. **Navigate to BE directory:**
    ```bash
-   cd backend
+   cd BE
    ```
 
 2. **Create virtual environment:**
@@ -93,7 +93,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
    OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-5. **Run the backend server:**
+5. **Run the BE server:**
    ```bash
    python main.py
    ```
@@ -104,7 +104,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 
 1. **Navigate to extension directory:**
    ```bash
-   cd chrome-extension
+   cd UI
    ```
 
 2. **Install dependencies:**
@@ -121,11 +121,11 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode"
    - Click "Load unpacked"
-   - Select the `chrome-extension/dist` folder
+   - Select the `UI/dist` folder
 
 ## Usage
 
-1. **Start the backend server**
+1. **Start the BE server**
 2. **Load the Chrome extension** in your browser
 3. **Navigate to a webpage** with MCQ questions
 4. **Click the extension icon** to open the popup
@@ -202,13 +202,13 @@ Get available AI models.
 
 ### Extension Development
 ```bash
-cd chrome-extension
+cd UI
 npm run dev  # Watch mode for development
 ```
 
 ### Backend Development
 ```bash
-cd backend
+cd BE
 python main.py  # Run with auto-reload in debug mode
 ```
 
@@ -255,7 +255,7 @@ This project is for educational purposes. Please ensure you have proper API keys
    - Check Chrome extension developer console
 
 2. **API connection failed:**
-   - Ensure backend server is running on port 8000
+   - Ensure BE server is running on port 8000
    - Check CORS configuration
    - Verify network connectivity
 
