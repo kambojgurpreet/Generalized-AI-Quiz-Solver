@@ -144,8 +144,7 @@ async def health_check():
     """Health check endpoint"""
     try:
         return {
-            "status": "healthy",
-            "redis": "disabled"
+            "status": "healthy"
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")

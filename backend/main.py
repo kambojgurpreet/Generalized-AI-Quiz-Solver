@@ -33,7 +33,6 @@ app.include_router(router, prefix="/api")
 async def startup_event():
     """Initialize services on startup"""
     print("✅ AI Quiz Solver API started")
-    print("💡 Redis caching disabled - running in direct mode")
 
 @app.on_event("shutdown")
 async def shutdown_event():
