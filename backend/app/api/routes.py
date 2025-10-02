@@ -11,7 +11,6 @@ from app.models.schemas import (
     AnswerResponse
 )
 from app.services.ai_service import AIService
-from app.services.redis_service import RedisService
 
 router = APIRouter()
 
@@ -19,15 +18,10 @@ async def get_ai_service():
     """Dependency to get AI service instance"""
     return AIService()
 
-async def get_redis_service():
-    """Dependency to get Redis service instance"""
-    return RedisService()
-
 @router.post("/detect-mcqs", response_model=MCQDetectionResponse)
 async def detect_mcqs(
     request: PageContentRequest,
-    ai_service: AIService = Depends(get_ai_service),
-    redis_service: RedisService = Depends(get_redis_service)
+    ai_service: AIService = Depends(get_ai_service)
 ):
     """
     Detect and solve MCQs from webpage content
@@ -40,34 +34,14 @@ async def detect_mcqs(
     try:
         processing_mode = ProcessingMode.MULTI if request.useMultiModel else ProcessingMode.SINGLE
         
-        # Check cache for full page analysis first
-        cached_result = await redis_service.get_cached_page_analysis(
-            request.url, 
-            request.content
-        )
-        
-        if cached_result:
-            cached_result["cached"] = True
-            return MCQDetectionResponse(**cached_result)
-        
         # Extract MCQs from content
         print(f"Extracting MCQs from content (length: {len(request.content)})")
         
-        # Check cache for MCQ extraction
-        cached_mcqs = await redis_service.get_cached_mcq_extraction(request.content)
-        
-        if cached_mcqs:
-            extracted_mcqs = cached_mcqs
-            print(f"Using cached MCQ extraction: {len(extracted_mcqs)} questions")
-        else:
-            extracted_mcqs = await ai_service.extract_mcqs_from_content(
-                request.content, 
-                request.layout
-            )
-            print(f"Extracted {len(extracted_mcqs)} MCQs from content")
-            
-            # Cache the extraction
-            await redis_service.cache_mcq_extraction(request.content, extracted_mcqs)
+        extracted_mcqs = await ai_service.extract_mcqs_from_content(
+            request.content, 
+            request.layout
+        )
+        print(f"Extracted {len(extracted_mcqs)} MCQs from content")
         
         if not extracted_mcqs:
             return MCQDetectionResponse(
@@ -87,35 +61,6 @@ async def detect_mcqs(
             options = mcq.get("options", [])
             
             if not question_text or not options:
-                continue
-            
-            # Check cache for this specific question
-            cached_answer = await redis_service.get_cached_mcq_answer(question_text, options)
-            
-            if cached_answer:
-                print(f"Using cached answer for question: {question_text[:50]}...")
-                
-                if request.useMultiModel:
-                    mcq_question = MCQQuestion(
-                        question=question_text,
-                        options=options,
-                        correct_option=cached_answer.get("correct_option", 0),
-                        confidence=cached_answer.get("confidence", 0),
-                        reasoning=cached_answer.get("reasoning", ""),
-                        model_responses=cached_answer.get("model_responses", [])
-                    )
-                    consensus_results.append(cached_answer.get("consensus", False))
-                else:
-                    mcq_question = MCQQuestion(
-                        question=question_text,
-                        options=options,
-                        correct_option=cached_answer.get("correct_option", 0),
-                        confidence=cached_answer.get("confidence", 0),
-                        reasoning=cached_answer.get("reasoning", "")
-                    )
-                    consensus_results.append(True)  # Single model always has "consensus"
-                
-                processed_questions.append(mcq_question)
                 continue
             
             # Process with AI
@@ -149,9 +94,6 @@ async def detect_mcqs(
                 consensus_results.append(True)  # Single model always has "consensus"
             
             processed_questions.append(mcq_question)
-            
-            # Cache the answer
-            await redis_service.cache_mcq_answer(question_text, options, answer_result)
         
         # Prepare final response
         response_data = {
@@ -162,13 +104,6 @@ async def detect_mcqs(
             "cached": False
         }
         
-        # Cache the full page analysis
-        await redis_service.cache_full_page_analysis(
-            request.url,
-            request.content,
-            response_data
-        )
-        
         return MCQDetectionResponse(**response_data)
         
     except Exception as e:
@@ -178,8 +113,7 @@ async def detect_mcqs(
 @router.post("/answer-question", response_model=AnswerResponse)
 async def answer_single_question(
     request: AnswerRequest,
-    ai_service: AIService = Depends(get_ai_service),
-    redis_service: RedisService = Depends(get_redis_service)
+    ai_service: AIService = Depends(get_ai_service)
 ):
     """
     Answer a single MCQ question
@@ -187,15 +121,6 @@ async def answer_single_question(
     This endpoint processes a single question through AI model(s)
     """
     try:
-        # Check cache first
-        cached_answer = await redis_service.get_cached_mcq_answer(
-            request.question, 
-            request.options
-        )
-        
-        if cached_answer:
-            return AnswerResponse(**cached_answer)
-        
         # Process with AI
         if request.useMultiModel:
             result = await ai_service.answer_mcq_multi_model(
@@ -208,13 +133,6 @@ async def answer_single_question(
                 request.options
             )
         
-        # Cache the result
-        await redis_service.cache_mcq_answer(
-            request.question, 
-            request.options, 
-            result
-        )
-        
         return AnswerResponse(**result)
         
     except Exception as e:
@@ -222,13 +140,12 @@ async def answer_single_question(
         raise HTTPException(status_code=500, detail=f"Error answering question: {str(e)}")
 
 @router.get("/health")
-async def health_check(redis_service: RedisService = Depends(get_redis_service)):
+async def health_check():
     """Health check endpoint"""
     try:
-        redis_status = await redis_service.ping()
         return {
             "status": "healthy",
-            "redis": "connected" if redis_status else "disconnected"
+            "redis": "disabled"
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")

@@ -9,8 +9,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 - **🎯 Multi-Model Consensus**: Option to use multiple AI models for higher accuracy
 - **💡 Smart Highlighting**: Highlights correct answers directly on the webpage
 - **📊 Detailed Reasoning**: Shows AI reasoning for each answer
-- **🔄 Redis Caching**: Fast responses with intelligent caching
-- **🔍 Google Search Integration**: Quick search for questions when needed
+- ** Google Search Integration**: Quick search for questions when needed
 
 ## Architecture
 
@@ -24,7 +23,6 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 ### Backend (FastAPI)
 - **FastAPI server** with async processing
 - **Multiple AI model integration** (GPT-4.1, Gemini 2.5 Pro)
-- **Redis caching** for performance optimization
 - **RESTful API** for extension communication
 
 ## Project Structure
@@ -50,8 +48,7 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 │   │   ├── api/              # API routes
 │   │   ├── models/           # Pydantic models
 │   │   └── services/         # Business logic
-│   │       ├── ai_service.py     # AI model integration
-│   │       └── redis_service.py  # Redis caching
+│   │       └── ai_service.py     # AI model integration
 │   ├── main.py               # FastAPI application
 │   ├── requirements.txt      # Python dependencies
 │   └── .env.example          # Environment variables template
@@ -63,38 +60,10 @@ A Chrome extension with AI-powered backend that detects Multiple Choice Question
 
 ### Prerequisites
 
-- Docker Desktop (recommended) OR Node.js 18+ and Python 3.8+
+- Node.js 18+ and Python 3.8+
 - OpenAI API key
 
-### Quick Start with Docker (Recommended)
-
-1. **Setup environment variables:**
-   ```bash
-   # Edit backend/.env and add your OpenAI API key
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
-
-2. **Start services with Docker:**
-   ```bash
-   # Windows
-   .\start-docker.bat
-   
-   # Linux/macOS
-   ./start-docker.sh
-   ```
-
-3. **Load Chrome extension:**
-   - Open Chrome → `chrome://extensions/`
-   - Enable "Developer mode" → "Load unpacked"
-   - Select `chrome-extension/dist` folder
-
-The Docker setup automatically handles:
-- ✅ Redis database
-- ✅ FastAPI backend server
-- ✅ All Python dependencies
-- ✅ Hot reload for development
-
-### Manual Setup (Alternative)
+### Backend Setup
 
 1. **Navigate to backend directory:**
    ```bash
@@ -122,14 +91,9 @@ The Docker setup automatically handles:
    Edit `.env` file and add your API keys:
    ```
    OPENAI_API_KEY=your_openai_api_key_here
-   REDIS_URL=redis://localhost:6379
    ```
 
-5. **Start Redis server:**
-   - Install and start Redis on your system
-   - Default configuration should work for development
-
-6. **Run the backend server:**
+5. **Run the backend server:**
    ```bash
    python main.py
    ```
@@ -161,7 +125,7 @@ The Docker setup automatically handles:
 
 ## Usage
 
-1. **Start the backend server** (ensure Redis is running)
+1. **Start the backend server**
 2. **Load the Chrome extension** in your browser
 3. **Navigate to a webpage** with MCQ questions
 4. **Click the extension icon** to open the popup
@@ -229,12 +193,6 @@ Get available AI models.
 - Shows individual model responses and reasoning
 - Higher accuracy through model agreement validation
 
-### Caching System
-- **Page Analysis Caching**: Caches full page MCQ analysis
-- **Question Caching**: Caches individual question answers
-- **Extraction Caching**: Caches MCQ extraction from content
-- Configurable TTL (Time To Live) for all cache entries
-
 ### Answer Highlighting
 - Automatically highlights correct answers on the webpage
 - Uses visual indicators (green background, border, animation)
@@ -257,7 +215,6 @@ python main.py  # Run with auto-reload in debug mode
 ### Testing
 - Test the extension on various quiz websites
 - Verify API responses with tools like Postman
-- Check Redis caching functionality
 
 ## Configuration
 
@@ -266,11 +223,6 @@ python main.py  # Run with auto-reload in debug mode
 **Backend (.env):**
 ```
 OPENAI_API_KEY=your_openai_api_key_here
-REDIS_URL=redis://localhost:6379
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-CACHE_TTL=3600
 API_HOST=0.0.0.0
 API_PORT=8000
 DEBUG=True
@@ -307,12 +259,7 @@ This project is for educational purposes. Please ensure you have proper API keys
    - Check CORS configuration
    - Verify network connectivity
 
-3. **Redis connection failed:**
-   - Ensure Redis server is running
-   - Check Redis connection URL in .env
-   - Verify Redis server accessibility
-
-4. **AI model errors:**
+3. **AI model errors:**
    - Verify OpenAI API key is valid
    - Check API quota and rate limits
    - Monitor API response status codes
@@ -321,7 +268,6 @@ This project is for educational purposes. Please ensure you have proper API keys
 
 - **Extension logs**: Check Chrome DevTools console
 - **Backend logs**: Check terminal output where server is running
-- **Redis logs**: Check Redis server logs
 - **API logs**: Monitor FastAPI automatic request logging
 
 ## Future Enhancements
