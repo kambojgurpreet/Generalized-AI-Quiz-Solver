@@ -140,7 +140,6 @@ function createOverlayPopup() {
       top: 50px !important;
       right: 30px !important;
       width: 380px !important;
-      height: 500px !important;
       min-width: 300px !important;
       min-height: 350px !important;
       max-width: 600px !important;
@@ -394,9 +393,21 @@ function createOverlayPopup() {
     // Close button
     const closeBtn = document.getElementById('ai-quiz-close-btn');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
+      closeBtn.addEventListener('click', (e) => {
         console.log('❌ Close button clicked');
+        e.stopPropagation(); // Prevent event bubbling
         document.getElementById(OVERLAY_ID).remove();
+      });
+    }
+    
+    // Prevent closing when clicking inside the overlay
+    if (container) {
+      container.addEventListener('mousedown', (e) => {
+        e.stopPropagation(); // Prevent any parent handlers
+      });
+      
+      container.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent any parent handlers
       });
     }
     
