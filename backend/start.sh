@@ -3,15 +3,17 @@
 echo "Starting AI Quiz Solver Backend..."
 echo
 
-# Set environment variables
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env.example .env
-    echo
-    echo "IMPORTANT: Please edit .env file and add your OpenAI API key!"
-    echo
-    read -p "Press any key to continue..."
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo "Create virtual environment..."
+    # python3 -m venv .venv
 fi
+
+echo "Activating virtual environment..."
+source .venv/bin/activate
+
+echo "Installing dependencies..."
+pip install -r requirements.txt
 
 # Start the FastAPI server
 echo "Starting FastAPI server..."

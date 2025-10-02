@@ -5,16 +5,26 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
+from contextlib import asynccontextmanager
+
 from app.api.routes import router
 
 # Load environment variables
 load_dotenv()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup and cleanup on shutdown"""
+    print("✅ AI Quiz Solver API started")
+    yield
+    print("✅ AI Quiz Solver API shutdown")
+
 # Create FastAPI app
 app = FastAPI(
     title="AI Quiz Solver API",
     description="Backend API for AI-powered quiz solving",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -29,15 +39,6 @@ app.add_middleware(
 # Include API routes
 app.include_router(router, prefix="/api")
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    print("✅ AI Quiz Solver API started")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    print("✅ AI Quiz Solver API shutdown")
 
 @app.get("/")
 async def root():

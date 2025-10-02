@@ -1,12 +1,14 @@
 import openai
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import asyncio
 import json
 import os
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
 
 load_dotenv()
+_gemini_client: Optional[genai.Client] = None
 
 class AIService:
     def __init__(self):
@@ -20,8 +22,6 @@ class AIService:
         
         # Google Gemini configuration
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        if self.google_api_key:
-            genai.configure(api_key=self.google_api_key)
         
         # Available models from different providers
         self.models = {
@@ -44,35 +44,35 @@ class AIService:
         
         system_prompt = """You are an expert at identifying and extracting multiple choice questions (MCQs) from webpage content.
 
-Your task is to:
-1. Identify all multiple choice questions in the provided content
-2. Extract the question text and all available options
-3. Return structured data for each question found
+            Your task is to:
+            1. Identify all multiple choice questions in the provided content
+            2. Extract the question text and all available options
+            3. Return structured data for each question found
 
-Guidelines:
-- Look for questions followed by multiple choice options (A, B, C, D, etc.)
-- Options may be formatted as: A) option, (A) option, A. option, or similar
-- Questions may be numbered or unnumbered
-- Include all context necessary to understand the question
-- If no MCQs are found, return an empty list
+            Guidelines:
+            - Look for questions followed by multiple choice options (A, B, C, D, etc.)
+            - Options may be formatted as: A) option, (A) option, A. option, or similar
+            - Questions may be numbered or unnumbered
+            - Include all context necessary to understand the question
+            - If no MCQs are found, return an empty list
 
-Return a JSON array where each object has:
-{
-    "question": "The complete question text",
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-    "question_index": 0
-}"""
+            Return a JSON array where each object has:
+            {
+                "question": "The complete question text",
+                "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+                "question_index": 0
+            }"""
 
         user_prompt = f"""Analyze this webpage content and extract all MCQ questions:
 
-Content:
-{content[:8000]}  # Limit content to avoid token limits
+            Content:
+            {content[:8000]}  # Limit content to avoid token limits
 
-Layout Info:
-URL: {layout_info.get('url', 'Unknown')}
-Title: {layout_info.get('title', 'Unknown')}
+            Layout Info:
+            URL: {layout_info.get('url', 'Unknown')}
+            Title: {layout_info.get('title', 'Unknown')}
 
-Extract all multiple choice questions with their options."""
+            Extract all multiple choice questions with their options."""
 
         try:
             response = await self._make_openai_request(
@@ -117,6 +117,9 @@ Extract all multiple choice questions with their options."""
                 else:
                     print("Empty response from AI")
                     return []
+            else:
+                print("No valid response from AI")
+                return []
                 
         except Exception as e:
             print(f"Error extracting MCQs: {e}")
@@ -179,22 +182,28 @@ Analyze this question and provide the correct answer with reasoning."""
                         # If parsing fails, return default response
                         return {
                             "correct_option": 0,
-                            "confidence": 50,
+                            "confidence": 0,
                             "reasoning": "Could not parse AI response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
                             "correct_option": 0,
-                            "confidence": 50,
+                            "confidence": 0,
                             "reasoning": "Failed to parse AI response as JSON"
-                        }
+                    }
                 else:
                     return {
                         "correct_option": 0,
-                        "confidence": 50,
+                        "confidence": 0,
                         "reasoning": "Empty response from AI"
                     }
+            else:
+                return {
+                    "correct_option": 0,
+                    "confidence": 0,
+                    "reasoning": "No valid response from AI"
+                }
                 
         except Exception as e:
             print(f"Error answering MCQ: {e}")
@@ -316,25 +325,25 @@ Analyze this question and provide the correct answer with reasoning."""
         
         system_prompt = f"""You are {model_config['name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
 
-1. The correct answer (as option index: 0, 1, 2, or 3)
-2. Your confidence level (0-100%)
-3. Detailed reasoning for your choice
+            1. The correct answer (as option index: 0, 1, 2, or 3)
+            2. Your confidence level (0-100%)
+            3. Detailed reasoning for your choice
 
-Return your response in this exact JSON format:
-{{
-    "correct_option": 0,
-    "confidence": 85,
-    "reasoning": "Detailed explanation of why this option is correct"
-}}"""
+            Return your response in this exact JSON format:
+            {{
+                "correct_option": 0,
+                "confidence": 85,
+                "reasoning": "Detailed explanation of why this option is correct"
+            }}"""
 
         options_text = "\n".join([f"{chr(65 + i)}. {option}" for i, option in enumerate(options)])
         
         user_prompt = f"""Question: {question}
 
-Options:
-{options_text}
+            Options:
+            {options_text}
 
-Analyze this question and provide the correct answer with reasoning."""
+            Analyze this question and provide the correct answer with reasoning."""
 
         try:
             response = await self._make_openai_request(
@@ -365,20 +374,20 @@ Analyze this question and provide the correct answer with reasoning."""
                         
                         return {
                             "correct_option": 0,
-                            "confidence": 50,
+                            "confidence": 0,
                             "reasoning": f"Could not parse {model_config['name']} response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
                             "correct_option": 0,
-                            "confidence": 50,
+                            "confidence": 0,
                             "reasoning": f"Failed to parse {model_config['name']} response as JSON"
                         }
                 else:
                     return {
                         "correct_option": 0,
-                        "confidence": 50,
+                        "confidence": 0,
                         "reasoning": f"Empty response from {model_config['name']}"
                     }
                 
@@ -388,6 +397,35 @@ Analyze this question and provide the correct answer with reasoning."""
                 "confidence": 0,
                 "reasoning": f"Error from {model_config['name']}: {str(e)}"
             }
+        
+        # Fallback return in case none of the above conditions are met
+        return {
+            "correct_option": 0,
+            "confidence": 0,
+            "reasoning": f"Unexpected error in {model_config['name']} processing"
+        }
+    
+    def get_gemini_client(self) -> genai.Client:
+        """Get or create Gemini client with lazy initialization"""
+        global _gemini_client
+        if _gemini_client is None:
+            api_key = os.getenv("GOOGLE_API_KEY")
+            location = os.getenv("GOOGLE_CLOUD_LOCATION")
+            project = os.getenv("GOOGLE_CLOUD_PROJECT")
+
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY environment variable is required")
+            
+            _gemini_client = genai.Client(
+                # api_key=api_key,
+                vertexai=True,
+                project=project,
+                location=location,
+            )
+            print("Gemini client initialized")
+        
+        return _gemini_client
+
 
     async def _answer_with_gemini(self, question: str, options: List[str], model_config: Dict) -> Dict:
         """Answer MCQ using Google Gemini model"""
@@ -401,71 +439,91 @@ Analyze this question and provide the correct answer with reasoning."""
         
         prompt = f"""You are {model_config['name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
 
-1. The correct answer (as option index: 0, 1, 2, or 3)
-2. Your confidence level (0-100%)
-3. Detailed reasoning for your choice
+            1. The correct answer (as option index: 0, 1, 2, or 3)
+            2. Your confidence level (0-100%)
+            3. Detailed reasoning for your choice
 
-Question: {question}
+            Question: {question}
 
-Options:
-{chr(10).join([f"{chr(65 + i)}. {option}" for i, option in enumerate(options)])}
+            Options:
+            {chr(10).join([f"{chr(65 + i)}. {option}" for i, option in enumerate(options)])}
 
-Return your response in this exact JSON format:
-{{
-    "correct_option": 0,
-    "confidence": 85,
-    "reasoning": "Detailed explanation of why this option is correct"
-}}
+            Return your response in this exact JSON format:
+            {{
+                "correct_option": 0,
+                "confidence": 85,
+                "reasoning": "Detailed explanation of why this option is correct"
+            }}
 
-Analyze this question and provide the correct answer with reasoning."""
+            Analyze this question and provide the correct answer with reasoning."""
 
         try:
             # Create the model
-            model = genai.GenerativeModel(model_config["model_id"])
+            gemini_client = self.get_gemini_client()
             
             # Generate response
             response = await asyncio.to_thread(
-                model.generate_content,
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=model_config["temperature"],
-                    max_output_tokens=1000,
+                gemini_client.models.generate_content,
+                model=model_config["model_id"],
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(thinking_budget=-1),
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    temperature=0.1,
                 )
             )
             
-            if response and response.text:
-                content_text = response.text
-                
-                # Parse JSON response
+            if response:
+                content_text = ""
                 try:
-                    start_idx = content_text.find('{')
-                    end_idx = content_text.rfind('}') + 1
-                    
-                    if start_idx != -1 and end_idx != 0:
-                        json_str = content_text[start_idx:end_idx]
-                        result = json.loads(json_str)
+                    # The 'response.text' quick accessor fails for multi-part responses.
+                    print("Falling back to text accessor")
+                    print(response.text)
+                    content_text = response.text
+                except ValueError:
+                    # Fallback to iterating over parts for multi-part responses.
+                    print("Falling back to parts iteration")
+                    print(response.parts)
+                    if response.parts:
+                        content_text = "".join(part.text for part in response.parts)
+
+                if content_text:
+                    # Parse JSON response
+                    try:
+                        start_idx = content_text.find('{')
+                        end_idx = content_text.rfind('}') + 1
                         
-                        if all(key in result for key in ['correct_option', 'confidence', 'reasoning']):
-                            if 0 <= result['correct_option'] < len(options):
-                                return result
-                    
+                        if start_idx != -1 and end_idx != 0:
+                            json_str = content_text[start_idx:end_idx]
+                            result = json.loads(json_str)
+                            
+                            if all(key in result for key in ['correct_option', 'confidence', 'reasoning']):
+                                if 0 <= result['correct_option'] < len(options):
+                                    return result
+                        
+                        return {
+                            "correct_option": 0,
+                            "confidence": 50,
+                            "reasoning": f"Could not parse {model_config['name']} response properly"
+                        }
+                        
+                    except json.JSONDecodeError:
+                        return {
+                            "correct_option": 0,
+                            "confidence": 50,
+                            "reasoning": f"Failed to parse {model_config['name']} response as JSON"
+                        }
+                else:
                     return {
                         "correct_option": 0,
-                        "confidence": 50,
-                        "reasoning": f"Could not parse {model_config['name']} response properly"
-                    }
-                    
-                except json.JSONDecodeError:
-                    return {
-                        "correct_option": 0,
-                        "confidence": 50,
-                        "reasoning": f"Failed to parse {model_config['name']} response as JSON"
+                        "confidence": 0,
+                        "reasoning": f"Empty content from {model_config['name']}"
                     }
             else:
                 return {
                     "correct_option": 0,
-                    "confidence": 50,
-                    "reasoning": f"Empty response from {model_config['name']}"
+                    "confidence": 0,
+                    "reasoning": f"No response from {model_config['name']}"
                 }
                 
         except Exception as e:
