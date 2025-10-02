@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const MainPage = ({ onDetectMCQs, loading }) => {
-  const [useMultiModel, setUseMultiModel] = useState(false);
+  const [useMultiModel, setUseMultiModel] = useState(true);
 
   const handleDetect = () => {
     onDetectMCQs(useMultiModel);
