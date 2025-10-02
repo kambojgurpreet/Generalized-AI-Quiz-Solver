@@ -102,6 +102,15 @@ function getFormElements() {
 }
 
 function highlightCorrectOption(questionIndex, optionIndex) {
+  console.log('🎯 Highlighting option:', { questionIndex, optionIndex });
+  
+  // Check if optionIndex is valid
+  if (optionIndex === -1) {
+    console.warn('⚠️ Cannot highlight answer: Invalid option index (-1)');
+    // Could show a user notification here
+    return;
+  }
+  
   // Remove existing highlights
   document.querySelectorAll('.ai-quiz-highlight').forEach(el => {
     el.classList.remove('ai-quiz-highlight');

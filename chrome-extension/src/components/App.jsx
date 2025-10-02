@@ -93,6 +93,14 @@ const App = () => {
 
   const handleHighlightAnswer = async (questionIndex, optionIndex) => {
     console.log('🎯 Highlighting answer:', { questionIndex, optionIndex });
+    
+    // Check if optionIndex is valid
+    if (optionIndex === -1) {
+      console.warn('⚠️ Cannot highlight answer: Invalid option index (-1)');
+      alert('Cannot highlight answer: No valid answer was determined due to processing errors.');
+      return;
+    }
+    
     try {
       // Get the active tab from normal windows (excluding popup)
       const activeTab = await getActiveTab();
@@ -162,6 +170,12 @@ function extractPageContent() {
 
 // Function to highlight correct option on the page
 function highlightCorrectOption(questionIndex, optionIndex) {
+  // Check if optionIndex is valid
+  if (optionIndex === -1) {
+    console.warn('⚠️ Cannot highlight answer: Invalid option index (-1)');
+    return;
+  }
+  
   // This is a simplified implementation
   // In a real scenario, you'd need more sophisticated DOM traversal
   const style = document.createElement('style');

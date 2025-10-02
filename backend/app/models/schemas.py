@@ -21,7 +21,7 @@ class MCQQuestion(BaseModel):
     
     question: str
     options: List[str]
-    correct_option: int
+    correct_option: int = Field(..., description="Index of correct option (0-3) or -1 if error/unknown")
     confidence: float
     reasoning: str
     model_responses: Optional[List[Dict[str, Any]]] = None
@@ -60,7 +60,7 @@ class AnswerRequest(BaseModel):
 class AnswerResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
-    correct_option: int
+    correct_option: int = Field(..., description="Index of correct option (0-3) or -1 if error/unknown")
     confidence: float
     reasoning: str
     model_responses: Optional[List[ModelResponse]] = None

@@ -1,4 +1,4 @@
-/* Main popup styles */
+﻿/* Main popup styles */
 body {
   margin: 0;
   padding: 0;
@@ -884,4 +884,31 @@ input:checked + .slider:before {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+}
+
+/* Error message styles */
+.error-message {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Disabled button styles */
+.highlight-button:disabled {
+  background: #e9ecef !important;
+  color: #6c757d !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.highlight-button:disabled:hover {
+  background: #e9ecef !important;
+  transform: none !important;
 }

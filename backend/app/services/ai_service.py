@@ -185,7 +185,7 @@ class AIService:
                 print(f"Error processing question {i}: {result}")
                 # Add error result
                 processed_results.append({
-                    "correct_option": 0,
+                    "correct_option": -1,
                     "confidence": 0,
                     "reasoning": f"Error processing question: {str(result)}",
                     "consensus": False
@@ -255,26 +255,26 @@ Analyze this question and provide the correct answer with reasoning."""
                         
                         # If parsing fails, return default response
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 0,
                             "reasoning": "Could not parse AI response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 0,
                             "reasoning": "Failed to parse AI response as JSON"
                     }
                 else:
                     return {
-                        "correct_option": 0,
+                        "correct_option": -1,
                         "confidence": 0,
                         "reasoning": "Empty response from AI"
                     }
             else:
                 return {
-                    "correct_option": 0,
+                    "correct_option": -1,
                     "confidence": 0,
                     "reasoning": "No valid response from AI"
                 }
@@ -282,7 +282,7 @@ Analyze this question and provide the correct answer with reasoning."""
         except Exception as e:
             print(f"Error answering MCQ: {e}")
             return {
-                "correct_option": 0,
+                "correct_option": -1,
                 "confidence": 0,
                 "reasoning": f"Error occurred: {str(e)}"
             }
@@ -338,12 +338,13 @@ Analyze this question and provide the correct answer with reasoning."""
                 model_responses.append(model_response)
                 
                 # Count votes
-                option_idx = response.get("correct_option", 0)
-                option_votes[option_idx] = option_votes.get(option_idx, 0) + 1
+                option_idx = response.get("correct_option", -1)
+                if option_idx >= 0:  # Only count valid options
+                    option_votes[option_idx] = option_votes.get(option_idx, 0) + 1
         
         # Determine consensus
         consensus_achieved = False
-        final_answer = 0
+        final_answer = -1
         final_confidence = 0
         
         if option_votes:
@@ -445,14 +446,14 @@ Analyze this question and provide the correct answer with reasoning."""
                 else:
                     print(f"All {max_retries + 1} attempts failed for {model_config['model_name']}: {e}")
                     return {
-                        "correct_option": 0,
+                        "correct_option": -1,
                         "confidence": 0,
                         "reasoning": f"Error from {model_config['model_name']} after {max_retries + 1} attempts: {str(e)}"
                     }
         
         # Fallback if all retries failed but no exception was raised
         return {
-            "correct_option": 0,
+            "correct_option": -1,
             "confidence": 0,
             "reasoning": f"Failed to get valid response from {model_config['model_name']} after {max_retries + 1} attempts"
         }
@@ -510,20 +511,20 @@ Analyze this question and provide the correct answer with reasoning."""
                                     return result
                         
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 0,
                             "reasoning": f"Could not parse {model_config['model_name']} response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 0,
                             "reasoning": f"Failed to parse {model_config['model_name']} response as JSON"
                         }
                 else:
                     return {
-                        "correct_option": 0,
+                        "correct_option": -1,
                         "confidence": 0,
                         "reasoning": f"Empty response from {model_config['model_name']}"
                     }
@@ -537,7 +538,7 @@ Analyze this question and provide the correct answer with reasoning."""
         
         # Fallback return in case none of the above conditions are met
         return {
-            "correct_option": 0,
+            "correct_option": -1,
             "confidence": 0,
             "reasoning": f"Unexpected error in {model_config['model_name']} processing"
         }
@@ -569,7 +570,7 @@ Analyze this question and provide the correct answer with reasoning."""
         
         if not self.google_api_key:
             return {
-                "correct_option": 0,
+                "correct_option": -1,
                 "confidence": 0,
                 "reasoning": "Google API key not configured"
             }
@@ -639,33 +640,33 @@ Analyze this question and provide the correct answer with reasoning."""
                                     return result
                         
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 50,
                             "reasoning": f"Could not parse {model_config['model_name']} response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
-                            "correct_option": 0,
+                            "correct_option": -1,
                             "confidence": 50,
                             "reasoning": f"Failed to parse {model_config['model_name']} response as JSON"
                         }
                 else:
                     return {
-                        "correct_option": 0,
+                        "correct_option": -1,
                         "confidence": 0,
                         "reasoning": f"Empty content from {model_config['model_name']}"
                     }
             else:
                 return {
-                    "correct_option": 0,
+                    "correct_option": -1,
                     "confidence": 0,
                     "reasoning": f"No response from {model_config['model_name']}"
                 }
                 
         except Exception as e:
             return {
-                "correct_option": 0,
+                "correct_option": -1,
                 "confidence": 0,
                 "reasoning": f"Error from {model_config['model_name']}: {str(e)}"
             }

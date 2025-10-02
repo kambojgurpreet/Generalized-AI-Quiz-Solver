@@ -90,7 +90,7 @@ async def detect_mcqs(
                         mcq_question = MCQQuestion(
                             question=question_text,
                             options=options,
-                            correct_option=result.get("correct_option", 0),
+                            correct_option=result.get("correct_option", -1),
                             confidence=result.get("confidence", 0),
                             reasoning=result.get("reasoning", ""),
                             model_responses=result.get("model_responses", [])
@@ -100,7 +100,7 @@ async def detect_mcqs(
                         mcq_question = MCQQuestion(
                             question=question_text,
                             options=options,
-                            correct_option=result.get("correct_option", 0),
+                            correct_option=result.get("correct_option", -1),
                             confidence=result.get("confidence", 0),
                             reasoning=result.get("reasoning", "")
                         )
@@ -127,7 +127,7 @@ async def detect_mcqs(
                         mcq_question = MCQQuestion(
                             question=question_text,
                             options=options,
-                            correct_option=answer_result.get("correct_option", 0),
+                            correct_option=answer_result.get("correct_option", -1),
                             confidence=answer_result.get("confidence", 0),
                             reasoning=answer_result.get("reasoning", ""),
                             model_responses=answer_result.get("model_responses", [])
@@ -141,7 +141,7 @@ async def detect_mcqs(
                         mcq_question = MCQQuestion(
                             question=question_text,
                             options=options,
-                            correct_option=answer_result.get("correct_option", 0),
+                            correct_option=answer_result.get("correct_option", -1),
                             confidence=answer_result.get("confidence", 0),
                             reasoning=answer_result.get("reasoning", "")
                         )

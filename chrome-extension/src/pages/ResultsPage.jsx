@@ -46,12 +46,19 @@ const ResultsPage = ({ results, onBack, onHighlightAnswer, onGoogleSearch }) => 
                   )}
                 </div>
               ))}
+              {question.correct_option === -1 && (
+                <div className="error-message">
+                  ⚠️ Unable to determine correct answer due to processing error
+                </div>
+              )}
             </div>
 
             <div className="actions">
               <button 
                 className="highlight-button"
                 onClick={() => onHighlightAnswer(qIndex, question.correct_option)}
+                disabled={question.correct_option === -1}
+                title={question.correct_option === -1 ? "Cannot highlight - no valid answer available" : "Highlight the correct answer"}
               >
                 Highlight Answer
               </button>
@@ -70,7 +77,7 @@ const ResultsPage = ({ results, onBack, onHighlightAnswer, onGoogleSearch }) => 
                   <div key={mIndex} className="model-response">
                     <div className="model-name">{response.model}</div>
                     <div className="model-answer">
-                      Answer: {String.fromCharCode(65 + response.selected_option)}
+                      Answer: {response.selected_option === -1 ? 'Error/Unknown' : String.fromCharCode(65 + response.selected_option)}
                     </div>
                     <div className="model-confidence">
                       Confidence: {response.confidence}%
