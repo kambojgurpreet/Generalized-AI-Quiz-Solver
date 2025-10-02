@@ -2,12 +2,6 @@
 echo Starting AI Quiz Solver Backend...
 echo.
 
-REM Create virtual environment if it doesn't exist
-if not exist .venv (
-    echo "Create virtual environment..."
-    @REM python -m venv .venv
-)
-
 echo "Activating virtual environment..."
 call .venv/Scripts/activate.bat
 

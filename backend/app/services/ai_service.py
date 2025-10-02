@@ -6,6 +6,7 @@ import json
 import os
 from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 _gemini_client: Optional[genai.Client] = None
@@ -23,19 +24,30 @@ class AIService:
         # Google Gemini configuration
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
         
+        # Concurrency settings
+        self.max_concurrent_requests = int(os.getenv("MAX_CONCURRENT_REQUESTS", "20"))
+        self.request_timeout = int(os.getenv("REQUEST_TIMEOUT", "300"))
+        
+        # Semaphore to limit concurrent API requests
+        self._request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        
         # Available models from different providers
         self.models = {
             "gpt-4.1": {
-                "name": "GPT-4.1",
+                "model_name": "GPT-4.1",
                 "provider": "openai",
                 "model_id": "gpt-4.1",
-                "temperature": 0.3
+                "temperature": 0.3,
+                "max_retries": 3,
+                "retry_delay": 1.0
             },
             "gemini-2.5-pro": {
-                "name": "Gemini 2.5 Pro",
+                "model_name": "Gemini 2.5 Pro",
                 "provider": "google",
                 "model_id": "gemini-2.5-pro",
-                "temperature": 0.3
+                "temperature": 0.3,
+                "max_retries": 3,
+                "retry_delay": 1.0
             }
         }
 
@@ -124,6 +136,68 @@ class AIService:
         except Exception as e:
             print(f"Error extracting MCQs: {e}")
             return []
+
+    async def answer_multiple_mcqs_batch(self, questions_batch: List[Dict], use_multi_model: bool = False) -> List[Dict]:
+        """
+        Process multiple MCQs in optimized batches for better performance
+        
+        Args:
+            questions_batch: List of dicts with 'question' and 'options' keys
+            use_multi_model: Whether to use multi-model consensus
+            
+        Returns:
+            List of answer results
+        """
+        
+        if not questions_batch:
+            return []
+        
+        start_time = time.time()
+        print(f"Processing batch of {len(questions_batch)} questions in parallel...")
+        
+        # Create tasks for all questions
+        tasks = []
+        for i, mcq_data in enumerate(questions_batch):
+            question = mcq_data.get("question", "")
+            options = mcq_data.get("options", [])
+            
+            if not question or not options:
+                continue
+            
+            if use_multi_model:
+                task = self.answer_mcq_multi_model(question, options)
+            else:
+                task = self.answer_mcq_single_model(question, options)
+            
+            tasks.append(task)
+        
+        # Process all questions concurrently
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            print(f"Error in batch processing: {e}")
+            return []
+        
+        # Filter and process results
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                print(f"Error processing question {i}: {result}")
+                # Add error result
+                processed_results.append({
+                    "correct_option": 0,
+                    "confidence": 0,
+                    "reasoning": f"Error processing question: {str(result)}",
+                    "consensus": False
+                })
+            else:
+                processed_results.append(result)
+        
+        processing_time = time.time() - start_time
+        print(f"Batch processing completed in {processing_time:.2f} seconds "
+              f"({len(processed_results)} questions, {processing_time/len(processed_results):.2f}s per question)")
+        
+        return processed_results
 
     async def answer_mcq_single_model(self, question: str, options: List[str]) -> Dict:
         """Answer an MCQ using a single AI model (GPT-4.1)"""
@@ -219,15 +293,29 @@ Analyze this question and provide the correct answer with reasoning."""
         # Use different AI providers
         models_to_use = ["gpt-4.1", "gemini-2.5-pro"]
         
-        # Get responses from all models
+        # Record start time for performance monitoring
+        start_time = time.time()
+        
+        # Get responses from all models concurrently with rate limiting
         tasks = []
         for model_key in models_to_use:
             if model_key in self.models:
-                task = self._answer_with_specific_model(question, options, model_key)
+                task = self._answer_with_specific_model_limited(question, options, model_key)
                 tasks.append(task)
         
-        # Wait for all responses
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        # Wait for all responses with timeout
+        try:
+            responses = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=self.request_timeout
+            )
+        except asyncio.TimeoutError:
+            print(f"Multi-model request timed out after {self.request_timeout} seconds")
+            responses = [Exception("Request timed out")] * len(tasks)
+        
+        # Record processing time
+        processing_time = time.time() - start_time
+        print(f"Multi-model processing completed in {processing_time:.2f} seconds")
         
         # Process responses
         model_responses = []
@@ -239,12 +327,13 @@ Analyze this question and provide the correct answer with reasoning."""
                 continue
                 
             if response and isinstance(response, dict):
-                model_name = self.models[models_to_use[i]]["name"]
+                model_name = self.models[models_to_use[i]]["model_name"]
                 model_response = {
                     "model": model_name,
                     "selected_option": response.get("correct_option", 0),
                     "confidence": response.get("confidence", 0),
-                    "reasoning": response.get("reasoning", "No reasoning provided")
+                    "reasoning": response.get("reasoning", "No reasoning provided"),
+                    "processing_time": response.get("processing_time", 0)
                 }
                 model_responses.append(model_response)
                 
@@ -289,9 +378,13 @@ Analyze this question and provide the correct answer with reasoning."""
             reasoning_parts.append("NO CONSENSUS: AI services disagree on the correct answer.")
             reasoning_parts.append(f"Vote distribution: {option_votes}")
         
+        reasoning_parts.append(f"\nProcessing completed in {processing_time:.2f} seconds")
         reasoning_parts.append("\nIndividual AI service responses:")
         for resp in model_responses:
-            reasoning_parts.append(f"- {resp['model']}: Option {chr(65 + resp['selected_option'])} ({resp['confidence']}% confidence)")
+            reasoning_parts.append(
+                f"- {resp['model']}: Option {chr(65 + resp['selected_option'])} "
+                f"({resp['confidence']}% confidence) [{resp['processing_time']:.2f}s]"
+            )
         
         final_reasoning = "\n".join(reasoning_parts)
         
@@ -300,30 +393,74 @@ Analyze this question and provide the correct answer with reasoning."""
             "confidence": final_confidence,
             "reasoning": final_reasoning,
             "model_responses": model_responses,
-            "consensus": consensus_achieved
+            "consensus": consensus_achieved,
+            "total_processing_time": processing_time
         }
 
+    async def _answer_with_specific_model_limited(self, question: str, options: List[str], model_key: str) -> Dict:
+        """Answer MCQ with a specific AI service using rate limiting"""
+        
+        async with self._request_semaphore:  # Limit concurrent requests
+            start_time = time.time()
+            result = await self._answer_with_specific_model(question, options, model_key)
+            processing_time = time.time() - start_time
+            
+            # Add processing time to result
+            if isinstance(result, dict):
+                result["processing_time"] = processing_time
+            
+            return result
+
     async def _answer_with_specific_model(self, question: str, options: List[str], model_key: str) -> Dict:
-        """Answer MCQ with a specific AI service (OpenAI or Google)"""
+        """Answer MCQ with a specific AI service (OpenAI or Google) with retry logic"""
         
         model_config = self.models[model_key]
         provider = model_config["provider"]
+        max_retries = model_config.get("max_retries", 3)
+        retry_delay = model_config.get("retry_delay", 1.0)
         
-        if provider == "openai":
-            return await self._answer_with_openai(question, options, model_config)
-        elif provider == "google":
-            return await self._answer_with_gemini(question, options, model_config)
-        else:
-            return {
-                "correct_option": 0,
-                "confidence": 0,
-                "reasoning": f"Unknown provider: {provider}"
-            }
+        for attempt in range(max_retries + 1):
+            try:
+                if provider == "openai":
+                    result = await self._answer_with_openai(question, options, model_config)
+                elif provider == "google":
+                    result = await self._answer_with_gemini(question, options, model_config)
+                else:
+                    return {
+                        "correct_option": 0,
+                        "confidence": 0,
+                        "reasoning": f"Unknown provider: {provider}"
+                    }
+                
+                # If we get a successful result, return it
+                if result and result.get("confidence", 0) > 0:
+                    return result
+                    
+            except Exception as e:
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"Attempt {attempt + 1} failed for {model_config['model_name']}, retrying in {wait_time}s: {e}")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    print(f"All {max_retries + 1} attempts failed for {model_config['model_name']}: {e}")
+                    return {
+                        "correct_option": 0,
+                        "confidence": 0,
+                        "reasoning": f"Error from {model_config['model_name']} after {max_retries + 1} attempts: {str(e)}"
+                    }
+        
+        # Fallback if all retries failed but no exception was raised
+        return {
+            "correct_option": 0,
+            "confidence": 0,
+            "reasoning": f"Failed to get valid response from {model_config['model_name']} after {max_retries + 1} attempts"
+        }
 
     async def _answer_with_openai(self, question: str, options: List[str], model_config: Dict) -> Dict:
         """Answer MCQ using OpenAI GPT model"""
         
-        system_prompt = f"""You are {model_config['name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
+        system_prompt = f"""You are {model_config['model_name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
 
             1. The correct answer (as option index: 0, 1, 2, or 3)
             2. Your confidence level (0-100%)
@@ -375,34 +512,34 @@ Analyze this question and provide the correct answer with reasoning."""
                         return {
                             "correct_option": 0,
                             "confidence": 0,
-                            "reasoning": f"Could not parse {model_config['name']} response properly"
+                            "reasoning": f"Could not parse {model_config['model_name']} response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
                             "correct_option": 0,
                             "confidence": 0,
-                            "reasoning": f"Failed to parse {model_config['name']} response as JSON"
+                            "reasoning": f"Failed to parse {model_config['model_name']} response as JSON"
                         }
                 else:
                     return {
                         "correct_option": 0,
                         "confidence": 0,
-                        "reasoning": f"Empty response from {model_config['name']}"
+                        "reasoning": f"Empty response from {model_config['model_name']}"
                     }
                 
         except Exception as e:
             return {
                 "correct_option": 0,
                 "confidence": 0,
-                "reasoning": f"Error from {model_config['name']}: {str(e)}"
+                "reasoning": f"Error from {model_config['model_name']}: {str(e)}"
             }
         
         # Fallback return in case none of the above conditions are met
         return {
             "correct_option": 0,
             "confidence": 0,
-            "reasoning": f"Unexpected error in {model_config['name']} processing"
+            "reasoning": f"Unexpected error in {model_config['model_name']} processing"
         }
     
     def get_gemini_client(self) -> genai.Client:
@@ -437,7 +574,7 @@ Analyze this question and provide the correct answer with reasoning."""
                 "reasoning": "Google API key not configured"
             }
         
-        prompt = f"""You are {model_config['name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
+        prompt = f"""You are {model_config['model_name']}, an expert at answering multiple choice questions. Analyze the question and options carefully, then provide:
 
             1. The correct answer (as option index: 0, 1, 2, or 3)
             2. Your confidence level (0-100%)
@@ -504,33 +641,33 @@ Analyze this question and provide the correct answer with reasoning."""
                         return {
                             "correct_option": 0,
                             "confidence": 50,
-                            "reasoning": f"Could not parse {model_config['name']} response properly"
+                            "reasoning": f"Could not parse {model_config['model_name']} response properly"
                         }
                         
                     except json.JSONDecodeError:
                         return {
                             "correct_option": 0,
                             "confidence": 50,
-                            "reasoning": f"Failed to parse {model_config['name']} response as JSON"
+                            "reasoning": f"Failed to parse {model_config['model_name']} response as JSON"
                         }
                 else:
                     return {
                         "correct_option": 0,
                         "confidence": 0,
-                        "reasoning": f"Empty content from {model_config['name']}"
+                        "reasoning": f"Empty content from {model_config['model_name']}"
                     }
             else:
                 return {
                     "correct_option": 0,
                     "confidence": 0,
-                    "reasoning": f"No response from {model_config['name']}"
+                    "reasoning": f"No response from {model_config['model_name']}"
                 }
                 
         except Exception as e:
             return {
                 "correct_option": 0,
                 "confidence": 0,
-                "reasoning": f"Error from {model_config['name']}: {str(e)}"
+                "reasoning": f"Error from {model_config['model_name']}: {str(e)}"
             }
 
     async def _make_openai_request(self, model: str, messages: List[Dict[str, Any]], temperature: float = 0.3):

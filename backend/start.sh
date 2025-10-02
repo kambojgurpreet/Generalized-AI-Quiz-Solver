@@ -3,12 +3,6 @@
 echo "Starting AI Quiz Solver Backend..."
 echo
 
-# Create virtual environment if it doesn't exist
-if [ ! -d ".venv" ]; then
-    echo "Create virtual environment..."
-    # python3 -m venv .venv
-fi
-
 echo "Activating virtual environment..."
 source .venv/bin/activate
 

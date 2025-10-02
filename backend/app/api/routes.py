@@ -52,48 +52,132 @@ async def detect_mcqs(
                 cached=False
             )
         
-        # Process each MCQ through AI models
-        processed_questions = []
-        consensus_results = []
+        # Check if we should use batch processing (more efficient for multiple questions)
+        if len(extracted_mcqs) > 1:
+            print(f"Using batch processing for {len(extracted_mcqs)} questions...")
+            
+            # Prepare batch data
+            questions_batch = []
+            for mcq in extracted_mcqs:
+                question_text = mcq.get("question", "")
+                options = mcq.get("options", [])
+                
+                if question_text and options:
+                    questions_batch.append({
+                        "question": question_text,
+                        "options": options
+                    })
+            
+            # Process batch
+            if questions_batch:
+                batch_results = await ai_service.answer_multiple_mcqs_batch(
+                    questions_batch, 
+                    use_multi_model=request.useMultiModel
+                )
+                
+                # Convert batch results to MCQQuestion objects
+                processed_questions = []
+                consensus_results = []
+                
+                for i, (mcq, result) in enumerate(zip(extracted_mcqs, batch_results)):
+                    question_text = mcq.get("question", "")
+                    options = mcq.get("options", [])
+                    
+                    if not question_text or not options:
+                        continue
+                    
+                    if request.useMultiModel:
+                        mcq_question = MCQQuestion(
+                            question=question_text,
+                            options=options,
+                            correct_option=result.get("correct_option", 0),
+                            confidence=result.get("confidence", 0),
+                            reasoning=result.get("reasoning", ""),
+                            model_responses=result.get("model_responses", [])
+                        )
+                        consensus_results.append(result.get("consensus", False))
+                    else:
+                        mcq_question = MCQQuestion(
+                            question=question_text,
+                            options=options,
+                            correct_option=result.get("correct_option", 0),
+                            confidence=result.get("confidence", 0),
+                            reasoning=result.get("reasoning", "")
+                        )
+                        consensus_results.append(True)
+                    
+                    processed_questions.append(mcq_question)
         
-        for mcq in extracted_mcqs:
-            question_text = mcq.get("question", "")
-            options = mcq.get("options", [])
+        else:
+            # Single question - use individual processing
+            async def process_single_mcq(mcq):
+                """Process a single MCQ and return the result"""
+                try:
+                    question_text = mcq.get("question", "")
+                    options = mcq.get("options", [])
+                    
+                    if not question_text or not options:
+                        return None
+                    
+                    print(f"Processing question with AI: {question_text[:50]}...")
+                    
+                    if request.useMultiModel:
+                        answer_result = await ai_service.answer_mcq_multi_model(question_text, options)
+                        
+                        mcq_question = MCQQuestion(
+                            question=question_text,
+                            options=options,
+                            correct_option=answer_result.get("correct_option", 0),
+                            confidence=answer_result.get("confidence", 0),
+                            reasoning=answer_result.get("reasoning", ""),
+                            model_responses=answer_result.get("model_responses", [])
+                        )
+                        
+                        consensus = answer_result.get("consensus", False)
+                        
+                    else:
+                        answer_result = await ai_service.answer_mcq_single_model(question_text, options)
+                        
+                        mcq_question = MCQQuestion(
+                            question=question_text,
+                            options=options,
+                            correct_option=answer_result.get("correct_option", 0),
+                            confidence=answer_result.get("confidence", 0),
+                            reasoning=answer_result.get("reasoning", "")
+                        )
+                        
+                        consensus = True  # Single model always has "consensus"
+                    
+                    return (mcq_question, consensus)
+                
+                except Exception as e:
+                    print(f"Error in process_single_mcq: {e}")
+                    return None
             
-            if not question_text or not options:
-                continue
+            # Process all MCQs concurrently
+            print(f"Processing {len(extracted_mcqs)} MCQs in parallel...")
+            mcq_tasks = [process_single_mcq(mcq) for mcq in extracted_mcqs]
+            mcq_results = await asyncio.gather(*mcq_tasks, return_exceptions=True)
             
-            # Process with AI
-            print(f"Processing question with AI: {question_text[:50]}...")
+            # Filter out None results and exceptions
+            processed_questions = []
+            consensus_results = []
             
-            if request.useMultiModel:
-                answer_result = await ai_service.answer_mcq_multi_model(question_text, options)
+            for result in mcq_results:
+                if isinstance(result, Exception):
+                    print(f"Error processing MCQ: {result}")
+                    continue
                 
-                mcq_question = MCQQuestion(
-                    question=question_text,
-                    options=options,
-                    correct_option=answer_result.get("correct_option", 0),
-                    confidence=answer_result.get("confidence", 0),
-                    reasoning=answer_result.get("reasoning", ""),
-                    model_responses=answer_result.get("model_responses", [])
-                )
+                if result is None:
+                    continue
                 
-                consensus_results.append(answer_result.get("consensus", False))
-                
-            else:
-                answer_result = await ai_service.answer_mcq_single_model(question_text, options)
-                
-                mcq_question = MCQQuestion(
-                    question=question_text,
-                    options=options,
-                    correct_option=answer_result.get("correct_option", 0),
-                    confidence=answer_result.get("confidence", 0),
-                    reasoning=answer_result.get("reasoning", "")
-                )
-                
-                consensus_results.append(True)  # Single model always has "consensus"
-            
-            processed_questions.append(mcq_question)
+                if isinstance(result, tuple) and len(result) == 2:
+                    mcq_question, consensus = result
+                    processed_questions.append(mcq_question)
+                    consensus_results.append(consensus)
+                else:
+                    print(f"Unexpected result format: {type(result)} - {result}")
+                    continue
         
         # Prepare final response
         response_data = {
@@ -148,6 +232,33 @@ async def health_check():
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+
+@router.get("/performance-stats")
+async def get_performance_stats():
+    """Get performance statistics for the AI service"""
+    try:
+        ai_service = AIService()
+        
+        # Basic configuration info
+        stats = {
+            "max_concurrent_requests": ai_service.max_concurrent_requests,
+            "request_timeout": ai_service.request_timeout,
+            "available_models": list(ai_service.models.keys()),
+            "multi_model_enabled": len(ai_service.models) > 1,
+            "batch_processing_enabled": True,
+            "retry_configuration": {
+                model_key: {
+                    "max_retries": config.get("max_retries", 3),
+                    "retry_delay": config.get("retry_delay", 1.0)
+                }
+                for model_key, config in ai_service.models.items()
+            }
+        }
+        
+        return stats
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting performance stats: {str(e)}")
 
 @router.get("/models")
 async def get_available_models():
