@@ -15,6 +15,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleDetectMCQs(request, sendResponse);
     return true; // Keep message channel open for async response
   }
+  
+  if (request.action === 'closeWindow') {
+    // Handle popup close request
+    console.log('🗂️ Closing popup window');
+    if (sender.tab) {
+      // If message comes from content script, just acknowledge
+      sendResponse({ success: true });
+    }
+    return false;
+  }
 });
 
 async function injectOverlay(tab) {

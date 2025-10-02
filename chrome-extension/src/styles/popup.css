@@ -56,11 +56,19 @@ body {
   font-size: 18px;
   font-weight: bold;
   transition: background 0.2s ease;
+  position: relative;
+  z-index: 1000;
+  outline: none;
 }
 
 .floating-close-button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.1);
+}
+
+.floating-close-button:active {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0.95);
 }
 
 .floating-content {
