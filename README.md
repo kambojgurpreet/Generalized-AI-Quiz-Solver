@@ -272,8 +272,8 @@ This project is for educational purposes. Please ensure you have proper API keys
 
 ## Future Enhancements
 
-- Support for additional AI models (Claude, Gemini, etc.)
-- Advanced quiz format detection (true/false, fill-in-the-blank)
+- Support for additional AI models (Claude, Grok, etc.)
+- Advanced quiz format detection (fill-in-the-blank, images based questions, mathematical questions)
 - User authentication and answer history
 - Export functionality for quiz results
 - Mobile app version
