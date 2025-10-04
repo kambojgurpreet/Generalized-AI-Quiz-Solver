@@ -1,4 +1,4 @@
-# AI Quiz Solver
+# Quiz Solver 2.0
 
 A Chrome extension with AI-powered BE that detects Multiple Choice Questions (MCQs) on web pages and provides answers using advanced AI models with consensus-based validation.
 
